@@ -3,16 +3,18 @@ ethutilsdir = $(includedir)/eth-utils
 
 libethutils_la_CXXFLAGS = \
   -I$(top_srcdir) \
-  $(GLOG_CFLAGS)
+  $(SECP256K1_CFLAGS) $(GLOG_CFLAGS)
 libethutils_la_LIBADD = \
   $(top_builddir)/keccak/libkeccak.la \
-  $(GLOG_LIBS)
+  $(SECP256K1_LIBS) $(GLOG_LIBS)
 libethutils_la_SOURCES = \
   address.cpp \
+  ecdsa.cpp \
   hexutils.cpp \
   keccak.cpp
 ethutils_HEADERS = \
   address.hpp \
+  ecdsa.hpp \
   hexutils.hpp \
   keccak.hpp
 
@@ -24,5 +26,6 @@ tests_LDADD = $(builddir)/libethutils.la \
   $(GLOG_LIBS) $(GTEST_LIBS)
 tests_SOURCES = \
   address_tests.cpp \
+  ecdsa_tests.cpp \
   hexutils_tests.cpp \
   keccak_tests.cpp
