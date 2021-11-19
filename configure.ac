@@ -35,6 +35,7 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 AC_CONFIG_FILES([
   Makefile \
   keccak/Makefile \
+  src/Makefile \
 ])
 AC_OUTPUT
 
