@@ -33,7 +33,8 @@ AX_PKG_CHECK_MODULES([GLOG], [], [libglog])
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 AC_CONFIG_FILES([
-  Makefile
+  Makefile \
+  keccak/Makefile \
 ])
 AC_OUTPUT
 

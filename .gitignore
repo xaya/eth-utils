@@ -8,6 +8,7 @@ config.h*
 config.status
 config.sub
 configure
+depcomp
 install-sh
 libtool
 ltmain.sh
@@ -17,3 +18,8 @@ stamp-h1
 
 Makefile
 Makefile.in
+*.la
+*.lo
+
+.deps
+.libs
