@@ -8,9 +8,11 @@ libethutils_la_LIBADD = \
   $(top_builddir)/keccak/libkeccak.la \
   $(GLOG_LIBS)
 libethutils_la_SOURCES = \
+  address.cpp \
   hexutils.cpp \
   keccak.cpp
 ethutils_HEADERS = \
+  address.hpp \
   hexutils.hpp \
   keccak.hpp
 
@@ -21,5 +23,6 @@ tests_CXXFLAGS = $(GLOG_CFLAGS) $(GTEST_CFLAGS)
 tests_LDADD = $(builddir)/libethutils.la \
   $(GLOG_LIBS) $(GTEST_LIBS)
 tests_SOURCES = \
+  address_tests.cpp \
   hexutils_tests.cpp \
   keccak_tests.cpp
