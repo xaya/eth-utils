@@ -1,0 +1,15 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: @PACKAGE_NAME@
+Version: @PACKAGE_VERSION@
+
+Description: A library for basic Ethereum primitives in C++.
+URL: https://github.com/xaya/eth-utils
+
+Requires.private: libglog libsecp256k1
+
+Cflags: -I${includedir}
+Libs: -L${libdir} -lethutils

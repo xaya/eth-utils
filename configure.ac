@@ -37,6 +37,8 @@ AC_CONFIG_FILES([
   Makefile \
   keccak/Makefile \
   src/Makefile \
+  \
+  ethutils.pc
 ])
 AC_OUTPUT
 
