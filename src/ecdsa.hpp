@@ -59,6 +59,15 @@ public:
    Address VerifyMessage (const std::string& msg,
                           const std::string& sgnHex) const;
 
+  /**
+   * Signs a message with the given key (using the legacy message encoding).
+   * Returns the signature as hex string with 0x prefix.
+   *
+   * The key must be valid, or else the method CHECK fails.  Otherwise
+   * it is guaranteed to succeed.
+   */
+  std::string SignMessage (const std::string& msg, const Key& key) const;
+
 };
 
 /**

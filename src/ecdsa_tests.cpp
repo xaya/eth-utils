@@ -77,5 +77,12 @@ TEST_F (EcdsaTests, SecretKeys)
   EXPECT_EQ (k2.GetAddress (), ADDRESS);
 }
 
+TEST_F (EcdsaTests, Signing)
+{
+  const auto key = ec.SecretKey (SECRET);
+  const auto sgn = ec.SignMessage ("foobar", key);
+  EXPECT_EQ (ec.VerifyMessage ("foobar", sgn), ADDRESS);
+}
+
 } // anonymous namespace
 } // namespace ethutils

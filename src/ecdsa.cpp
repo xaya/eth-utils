@@ -20,6 +20,8 @@ namespace ethutils
 namespace
 {
 
+/* ************************************************************************** */
+
 /**
  * Returns the bytes of a string as unsigned char (as used for libsecp256k1).
  */
@@ -59,6 +61,22 @@ PubkeyToAddress (const secp256k1_context* ctx, const secp256k1_pubkey& pubkey)
   return Address ("0x" + Hexlify (pubkeyHash.substr (12)));
 }
 
+/**
+ * Converts a message to the corresponding hash that is signed with ECDSA.
+ */
+std::string
+MessageHash (const std::string& msg)
+{
+  std::ostringstream msgToHash;
+  msgToHash << '\x19' << "Ethereum Signed Message:\n"
+            << msg.size () << msg;
+
+  std::string msgHash = Keccak256 (msgToHash.str ());
+  CHECK_EQ (msgHash.size (), 32);
+
+  return msgHash;
+}
+
 } // anonymous namespace
 
 /* ************************************************************************** */
@@ -79,7 +97,8 @@ public:
 
   Context ()
   {
-    ctx = secp256k1_context_create (SECP256K1_CONTEXT_VERIFY);
+    const unsigned flags = SECP256K1_CONTEXT_VERIFY | SECP256K1_CONTEXT_SIGN;
+    ctx = secp256k1_context_create (flags);
   }
 
   ~Context ()
@@ -167,12 +186,6 @@ ECDSA::Key::GetAddress () const
 Address
 ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
 {
-  std::ostringstream msgToHash;
-  msgToHash << '\x19' << "Ethereum Signed Message:\n"
-            << msg.size () << msg;
-  const std::string msgHash = Keccak256 (msgToHash.str ());
-  CHECK_EQ (msgHash.size (), 32);
-
   /* Parse the Ethereum signature into the 64-byte curve point and the
      recovery ID.  The recovery ID is the 65th byte, and it is 27 or 28
      while libsecp256k1 expects it as 0 or 1.  */
@@ -209,6 +222,7 @@ ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
       return Address ();
     }
 
+  const std::string msgHash = MessageHash (msg);
   secp256k1_pubkey pubkey;
   if (!secp256k1_ecdsa_recover (
       **ctx, &pubkey, &sig, UChar (msgHash)))
@@ -218,6 +232,35 @@ ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
     }
 
   return PubkeyToAddress (**ctx, pubkey);
+}
+
+std::string
+ECDSA::SignMessage (const std::string& msg, const Key& key) const
+{
+  CHECK (key) << "The secret key must be valid";
+
+  /* We already verified that the key is valid, and are using the default
+     nonce construction.  Thus signing must succeed.  */
+  const std::string msgHash = MessageHash (msg);
+  secp256k1_ecdsa_recoverable_signature sig;
+  CHECK (secp256k1_ecdsa_sign_recoverable (
+      **ctx, &sig, UChar (msgHash), key.data.data (), nullptr, nullptr))
+      << "ECDSA signature failed";
+
+  /* Serialise the signature as curve point and recovery ID.  The Ethereum
+     signature is then the curve point (64 bytes) plus the recovery ID appended
+     as another byte, but using 27 or 28 instead of 0 or 1.  */
+  std::string sgnBin(65, '\0');
+  int recoveryId;
+  CHECK (secp256k1_ecdsa_recoverable_signature_serialize_compact (
+      **ctx, UChar (sgnBin), &recoveryId, &sig))
+      << "Failed to serialise ECDSA signature";
+  CHECK (recoveryId >= 0 && recoveryId <= 1)
+      << "Unexpected recovery ID: " << recoveryId;
+  recoveryId += 27;
+  sgnBin[64] = static_cast<char> (recoveryId);
+
+  return "0x" + Hexlify (sgnBin);
 }
 
 /* ************************************************************************** */
