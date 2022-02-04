@@ -26,8 +26,8 @@ AX_CHECK_COMPILE_FLAG([-Wno-deprecated],
 CXXFLAGS="${CXXFLAGS} -DGLOG_NO_ABBREVIATED_SEVERITIES"
 
 # Private dependencies of the library itself.
-AX_PKG_CHECK_MODULES([SECP256K1], [], [libglog])
-AX_PKG_CHECK_MODULES([GLOG], [], [libsecp256k1])
+AX_PKG_CHECK_MODULES([SECP256K1], [], [libsecp256k1])
+AX_PKG_CHECK_MODULES([GLOG], [], [libglog])
 
 # Private dependencies that are not needed for the library, but only for
 # the unit tests.

@@ -1,4 +1,4 @@
-// Copyright (C) 2021 The Xaya developers
+// Copyright (C) 2021-2022 The Xaya developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,6 +16,52 @@
 
 namespace ethutils
 {
+
+namespace
+{
+
+/**
+ * Returns the bytes of a string as unsigned char (as used for libsecp256k1).
+ */
+const unsigned char*
+UChar (const std::string& str)
+{
+  return reinterpret_cast<const unsigned char*> (str.data ());
+}
+
+/**
+ * Mutable variant of UChar.
+ */
+unsigned char*
+UChar (std::string& str)
+{
+  return reinterpret_cast<unsigned char*> (&str[0]);
+}
+
+/**
+ * Converts a secp256k1 pubkey into an address.
+ */
+Address
+PubkeyToAddress (const secp256k1_context* ctx, const secp256k1_pubkey& pubkey)
+{
+  std::string pubkeyBin(65, '\0');
+  size_t pubkeyBinLen = pubkeyBin.size ();
+  CHECK (secp256k1_ec_pubkey_serialize (
+            ctx, UChar (pubkeyBin), &pubkeyBinLen,
+            &pubkey, SECP256K1_EC_UNCOMPRESSED))
+      << "Serialising the pubkey failed";
+  CHECK_EQ (pubkeyBinLen, 65) << "Unexpected serialised pubkey length returned";
+  CHECK_EQ (pubkeyBin[0], '\x04')
+      << "Unexpected first byte in serialised uncompressed pubkey";
+
+  const std::string pubkeyHash = Keccak256 (pubkeyBin.substr (1));
+  CHECK_EQ (pubkeyHash.size (), 32);
+  return Address ("0x" + Hexlify (pubkeyHash.substr (12)));
+}
+
+} // anonymous namespace
+
+/* ************************************************************************** */
 
 /**
  * Wrapper class around the libsecp256k1 context, so we can hide the library
@@ -56,6 +102,68 @@ ECDSA::ECDSA ()
 
 ECDSA::~ECDSA () = default;
 
+ECDSA::Key
+ECDSA::SecretKey (const std::string& inp) const
+{
+  return Key (*this, inp);
+}
+
+/* ************************************************************************** */
+
+ECDSA::Key::Key (const ECDSA& p, const std::string& inp)
+  : parent(&p)
+{
+  std::string binKey;
+
+  if (inp.size () == 32)
+    binKey = inp;
+  else if (inp.size () == 2 + 2 * 32)
+    {
+      if (inp.substr (0, 2) != "0x")
+        {
+          LOG (WARNING) << "Secret key is missing 0x prefix";
+          return;
+        }
+
+      if (!Unhexlify (inp.substr (2), binKey))
+        {
+          LOG (WARNING) << "Secret key is invalid hex";
+          return;
+        }
+    }
+  else
+    {
+      LOG (WARNING) << "Secret key has invalid length " << inp.size ();
+      return;
+    }
+
+  const unsigned char* buf = UChar (binKey);
+  std::vector<unsigned char> bytes(buf, buf + binKey.size ());
+  CHECK_EQ (bytes.size (), 32);
+
+  if (secp256k1_ec_seckey_verify (**parent->ctx, bytes.data ()))
+    data = std::move (bytes);
+  else
+    LOG (WARNING) << "Secret key is invalid";
+}
+
+Address
+ECDSA::Key::GetAddress () const
+{
+  CHECK (*this) << "Key is not valid";
+
+  /* Note that the secret key is validated by libsecp256k1 whenever
+     the instance is initialised already.  So at this point, it is always
+     valid and thus the pubkey conversion should never fail.  */
+  secp256k1_pubkey pubkey;
+  CHECK (secp256k1_ec_pubkey_create (**parent->ctx, &pubkey, data.data ()))
+      << "Conversion of secret to public key failed";
+
+  return PubkeyToAddress (**parent->ctx, pubkey);
+}
+
+/* ************************************************************************** */
+
 Address
 ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
 {
@@ -95,9 +203,7 @@ ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
 
   secp256k1_ecdsa_recoverable_signature sig;
   if (!secp256k1_ecdsa_recoverable_signature_parse_compact (
-          **ctx, &sig,
-          reinterpret_cast<const unsigned char*> (sgnBin.data ()),
-          recoveryId))
+          **ctx, &sig, UChar (sgnBin), recoveryId))
     {
       LOG (WARNING) << "Failed to parse recoverable signature";
       return Address ();
@@ -105,31 +211,15 @@ ECDSA::VerifyMessage (const std::string& msg, const std::string& sgnHex) const
 
   secp256k1_pubkey pubkey;
   if (!secp256k1_ecdsa_recover (
-      **ctx, &pubkey, &sig,
-      reinterpret_cast<const unsigned char*> (msgHash.data ())))
+      **ctx, &pubkey, &sig, UChar (msgHash)))
     {
       LOG (WARNING) << "Failed to recover public key from signature";
       return Address ();
     }
 
-  /* Format the recovered pubkey as uncompressed byte array.  This will yield
-     65 bytes, with the first being 0x04 to denote it is uncompressed, and the
-     following 64 bytes being the actual curve point.  */
-  std::string pubkeyBin(65, '\0');
-  size_t pubkeyBinLen = pubkeyBin.size ();
-  CHECK (secp256k1_ec_pubkey_serialize (
-            **ctx,
-            reinterpret_cast<unsigned char*> (&pubkeyBin[0]), &pubkeyBinLen,
-            &pubkey, SECP256K1_EC_UNCOMPRESSED))
-      << "Serialising the pubkey failed";
-  CHECK_EQ (pubkeyBinLen, 65) << "Unexpected serialised pubkey length returned";
-  CHECK_EQ (pubkeyBin[0], '\x04')
-      << "Unexpected first byte in serialised uncompressed pubkey";
-
-  /* Generate the Ethereum address from the pubkey.  */
-  const std::string pubkeyHash = Keccak256 (pubkeyBin.substr (1));
-  CHECK_EQ (pubkeyHash.size (), 32);
-  return Address ("0x" + Hexlify (pubkeyHash.substr (12)));
+  return PubkeyToAddress (**ctx, pubkey);
 }
+
+/* ************************************************************************** */
 
 } // namespace ethutils

@@ -1,4 +1,4 @@
-// Copyright (C) 2021 The Xaya developers
+// Copyright (C) 2021-2022 The Xaya developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace ethutils
 {
@@ -32,11 +33,20 @@ private:
 
 public:
 
+  class Key;
+
   ECDSA ();
   ~ECDSA ();
 
   ECDSA (const ECDSA&) = delete;
   void operator= (const ECDSA&) = delete;
+
+  /**
+   * Constructs and returns a secret key for this context from a string.
+   * The string can either be a raw binary string with 32 bytes, or a
+   * hex-encoded string with 0x prefix.
+   */
+  Key SecretKey (const std::string& inp) const;
 
   /**
    * Verifies an Ethereum signature made on a message.  Returns the
@@ -48,6 +58,59 @@ public:
    */
    Address VerifyMessage (const std::string& msg,
                           const std::string& sgnHex) const;
+
+};
+
+/**
+ * A private key for signing ECDSA messages.
+ */
+class ECDSA::Key
+{
+
+private:
+
+  /** The corresponding ECDSA context.  */
+  const ECDSA* parent;
+
+  /** The underlying 32-byte key or empty if the key is invalid.  */
+  std::vector<unsigned char> data;
+
+  /**
+   * Constructs a key from given input.  The input should be either a raw
+   * binary string of 32 bytes, or a hex-encoded string with 0x prefix.
+   *
+   * This method is called from ECDSA::SecretKey.
+   */
+  explicit Key (const ECDSA& p, const std::string& inp);
+
+  friend class ECDSA;
+
+public:
+
+  /**
+   * Constructs an invalid key (but it can be assigned to from other keys).
+   */
+  Key () = default;
+
+  Key (const Key&) = default;
+  Key (Key&&) = default;
+
+  Key& operator= (const Key&) = default;
+  Key& operator= (Key&&) = default;
+
+  /**
+   * Returns true if the key is valid.
+   */
+  inline operator
+  bool () const
+  {
+    return !data.empty ();
+  }
+
+  /**
+   * Returns the address corresponding to the key.
+   */
+  Address GetAddress () const;
 
 };
 
