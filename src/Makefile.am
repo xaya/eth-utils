@@ -8,11 +8,13 @@ libethutils_la_LIBADD = \
   $(top_builddir)/keccak/libkeccak.la \
   $(SECP256K1_LIBS) $(GLOG_LIBS)
 libethutils_la_SOURCES = \
+  abi.cpp \
   address.cpp \
   ecdsa.cpp \
   hexutils.cpp \
   keccak.cpp
 ethutils_HEADERS = \
+  abi.hpp \
   address.hpp \
   ecdsa.hpp \
   hexutils.hpp \
@@ -25,6 +27,7 @@ tests_CXXFLAGS = $(GLOG_CFLAGS) $(GTEST_CFLAGS)
 tests_LDADD = $(builddir)/libethutils.la \
   $(GLOG_LIBS) $(GTEST_LIBS)
 tests_SOURCES = \
+  abi_tests.cpp \
   address_tests.cpp \
   ecdsa_tests.cpp \
   hexutils_tests.cpp \
