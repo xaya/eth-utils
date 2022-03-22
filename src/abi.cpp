@@ -14,9 +14,23 @@ namespace ethutils
 /* ************************************************************************** */
 
 AbiDecoder::AbiDecoder (const std::string& str)
-  : data(str.substr (2)), in(data)
+  : data(str.substr (2)), in(data), parent(nullptr), parentOffset(0)
 {
   CHECK_EQ (str.substr (0, 2), "0x") << "Missing 0x prefix:\n" << str;
+}
+
+AbiDecoder::AbiDecoder (AbiDecoder& other, const size_t start)
+  : data(other.data.substr (2 * start)), in(data),
+    parent(&other), parentOffset(start)
+{}
+
+AbiDecoder::~AbiDecoder ()
+{
+  if (parent != nullptr)
+    {
+      const size_t parentEnd = std::max (headEnd, tailEnd) + parentOffset;
+      parent->tailEnd = std::max (parent->tailEnd, parentEnd);
+    }
 }
 
 std::string
@@ -25,6 +39,7 @@ AbiDecoder::ReadBytes (const size_t len)
   std::string res(2 * len, '\0');
   in.read (&res[0], res.size ());
   CHECK (in) << "Error reading data, EOF?";
+  headEnd += len;
   return res;
 }
 
@@ -50,7 +65,7 @@ AbiDecoder::ReadDynamic ()
      where the real data for the string is.  */
   const size_t ptr = ParseInt (ReadUint (256));
 
-  return AbiDecoder ("0x" + data.substr (2 * ptr));
+  return AbiDecoder (*this, ptr);
 }
 
 std::string
@@ -84,8 +99,19 @@ AbiDecoder::ReadArray (size_t& len)
 
   /* When the elements contain dynamic data, tail pointers in them
      are actually relative to the start of the elements data, not including
-     the initial length.  */
-  return AbiDecoder ("0x" + dec.data.substr (2 * 0x20));
+     the initial length.  Thus we need to construct a new decoder and
+     cannot reuse dec.
+
+     The new decoder has to be constructed directly off this, though, so that
+     it will update the end mark correctly.  dec will go out of scope when
+     we return, so it may not be used as parent by the returned decoder.  */
+  return AbiDecoder (*this, dec.parentOffset + 0x20);
+}
+
+std::string
+AbiDecoder::GetAllDataRead () const
+{
+  return "0x" + data.substr (0, 2 * std::max (headEnd, tailEnd));
 }
 
 int64_t

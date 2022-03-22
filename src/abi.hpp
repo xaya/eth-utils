@@ -21,10 +21,35 @@ class AbiDecoder
 private:
 
   /** The input data being read (as hex string).  */
-  const std::string data;
+  std::string data;
 
   /** The stream of input data.  */
   std::istringstream in;
+
+  /* The data string passed may not end exactly at the end of this decoder's
+     data (for instance, when ReadDynamic is used to construct it).  We keep
+     track of the actual data accessed (both in the heads and tail parts),
+     so that after reading all, we can then extract the exact data,
+     as that can be useful.  */
+
+  /** End pointer in the heads part (first byte not yet accessed).  */
+  size_t headEnd = 0;
+
+  /** End pointer in the tail part.  */
+  size_t tailEnd = 0;
+
+  /**
+   * If this is based on the tail data of another decoder (using ReadDyanmic),
+   * this points to the parent decoder.  In this situation, the tailEnd
+   * of the parent decoder will be updated when this instance is destructed.
+   */
+  AbiDecoder* parent;
+
+  /**
+   * If we have a parent, the offset into the parent's data for where our
+   * own data starts.
+   */
+  size_t parentOffset;
 
   /**
    * Reads the given number of bytes as hex characters (i.e. 2n characters)
@@ -35,6 +60,16 @@ private:
 public:
 
   explicit AbiDecoder (const std::string& str);
+
+  /**
+   * Constructs a decoder based on the data of the given other decoder,
+   * starting at a given index (by bytes, not hex characters).  If this
+   * method is used, then the end-mark of the underlying decoder will be
+   * updated based on data read from here once this decoder is destructed.
+   */
+  explicit AbiDecoder (AbiDecoder& other, size_t start);
+
+  ~AbiDecoder ();
 
   AbiDecoder (AbiDecoder&) = delete;
   void operator= (AbiDecoder&) = delete;
@@ -64,6 +99,12 @@ public:
    * and returns a new decoder that will return the elements one by one.
    */
   AbiDecoder ReadArray (size_t& len);
+
+  /**
+   * Returns the full data (as hex string) actually read so far from
+   * this decoder, based on our tracked end positions.
+   */
+  std::string GetAllDataRead () const;
 
   /**
    * Parses a string (hex or decimal) as integer, verifying that
