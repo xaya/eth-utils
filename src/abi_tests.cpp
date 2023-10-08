@@ -4,6 +4,8 @@
 
 #include "abi.hpp"
 
+#include "hexutils.hpp"
+
 #include <gtest/gtest.h>
 
 namespace ethutils
@@ -103,6 +105,34 @@ TEST_F (AbiEncoderTests, ConcatHex)
   EXPECT_EQ (AbiEncoder::ConcatHex ("0x1234", "0xbbcc"), "0x1234bbcc");
   EXPECT_DEATH (AbiEncoder::ConcatHex ("1234", "0xbbcc"), "Missing hex prefix");
   EXPECT_DEATH (AbiEncoder::ConcatHex ("0x1234", "bbcc"), "Missing hex prefix");
+}
+
+TEST_F (AbiEncoderTests, Dynamic)
+{
+  /* This is an example from the Solidity 0.8.22 ABI docs.  */
+
+  AbiEncoder enc(3);
+  enc.WriteBytes ("0x" + Hexlify ("dave"));
+  enc.WriteWord (AbiEncoder::FormatInt (1));
+
+  AbiEncoder array(4);
+  array.WriteWord (AbiEncoder::FormatInt (3));
+  array.WriteWord (AbiEncoder::FormatInt (1));
+  array.WriteWord (AbiEncoder::FormatInt (2));
+  array.WriteWord (AbiEncoder::FormatInt (3));
+
+  enc.WriteDynamic (array.Finalise ());
+
+  EXPECT_EQ (enc.Finalise (), "0x"
+      "0000000000000000000000000000000000000000000000000000000000000060"
+      "0000000000000000000000000000000000000000000000000000000000000001"
+      "00000000000000000000000000000000000000000000000000000000000000a0"
+      "0000000000000000000000000000000000000000000000000000000000000004"
+      "6461766500000000000000000000000000000000000000000000000000000000"
+      "0000000000000000000000000000000000000000000000000000000000000003"
+      "0000000000000000000000000000000000000000000000000000000000000001"
+      "0000000000000000000000000000000000000000000000000000000000000002"
+      "0000000000000000000000000000000000000000000000000000000000000003");
 }
 
 TEST_F (AbiEncoderTests, ForwarderExecute)

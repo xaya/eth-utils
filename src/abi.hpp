@@ -1,4 +1,4 @@
-// Copyright (C) 2021-2022 The Xaya developers
+// Copyright (C) 2021-2023 The Xaya developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -151,6 +151,13 @@ public:
    * zeros as needed.
    */
   void WriteWord (const std::string& data);
+
+  /**
+   * Writes general dynamic data.  The already-encoded tail part
+   * is passed in.  Callers might use another AbiEncoder instance to
+   * construct this (and then call Finalise() on it to get the tail data).
+   */
+  void WriteDynamic (const std::string& tailData);
 
   /**
    * Writes the given data as a dynamic "bytes" instance.

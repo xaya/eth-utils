@@ -1,4 +1,4 @@
-// Copyright (C) 2021-2022 The Xaya developers
+// Copyright (C) 2021-2023 The Xaya developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -62,7 +62,7 @@ AbiDecoder
 AbiDecoder::ReadDynamic ()
 {
   /* In the actual data stream we have just a pointer to the tail data
-     where the real data for the string is.  */
+     where the real data for the dynamic entity is.  */
   const size_t ptr = ParseInt (ReadUint (256));
 
   return AbiDecoder (*this, ptr);
@@ -185,16 +185,21 @@ AbiEncoder::WriteWord (const std::string& data)
 }
 
 void
+AbiEncoder::WriteDynamic (const std::string& tailData)
+{
+  CHECK_EQ (tail.str ().size () % 2, 0);
+  const unsigned ptr = headWords * 32 + tail.str ().size () / 2;
+  WriteWord (FormatInt (ptr));
+  tail << Strip0x (tailData);
+}
+
+void
 AbiEncoder::WriteBytes (const std::string& data)
 {
   const std::string plainData = Strip0x (ToLower (data));
 
   CHECK_EQ (plainData.size () % 2, 0);
   const unsigned numBytes = plainData.size () / 2;
-
-  CHECK_EQ (tail.str ().size () % 2, 0);
-  const unsigned ptr = headWords * 32 + tail.str ().size () / 2;
-  WriteWord (FormatInt (ptr));
 
   /* Construct a temporary second encoder that we use to write
      the actual data in the tail portion (length + bytes).  */
@@ -203,7 +208,8 @@ AbiEncoder::WriteBytes (const std::string& data)
   dataEnc.tail << plainData;
   if (numBytes == 0 || numBytes % 32 > 0)
     dataEnc.tail << std::string (2 * (32 - (numBytes % 32)), '0');
-  tail << Strip0x (dataEnc.Finalise ());
+
+  WriteDynamic (dataEnc.Finalise ());
 }
 
 std::string
